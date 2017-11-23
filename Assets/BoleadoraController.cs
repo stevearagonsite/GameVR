@@ -10,6 +10,7 @@ public class BoleadoraController : MonoBehaviour
     Rigidbody _rb;
     private bool _released;
     BoleadoraHandleController handle;
+    public Rigidbody extreme;
 
     private void Awake()
     {
@@ -23,7 +24,7 @@ public class BoleadoraController : MonoBehaviour
     private void FixedUpdate()
     {
         if (!_released) return;
-        _rb.MoveRotation(_rb.rotation * Quaternion.AngleAxis(20, transform.right));
+        _rb.MoveRotation(_rb.rotation * Quaternion.AngleAxis(15, transform.right));
     }
 
     private void Released()
@@ -41,10 +42,9 @@ public class BoleadoraController : MonoBehaviour
         foreach(var elem in fullChain)
             elem.gameObject.transform.localPosition = gameObject.transform.InverseTransformPoint(pos[elem.gameObject]);
 
-        _rb.useGravity = false; //poner en true 
+        _rb.useGravity = true;
         _rb.isKinematic = false;
-        handle.gameObject.
-            GetComponent<Rigidbody>().isKinematic = false;
+        _rb.AddForce(extreme.velocity, ForceMode.Impulse);
         _released = true;
     }
 }

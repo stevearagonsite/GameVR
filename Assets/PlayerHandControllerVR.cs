@@ -9,6 +9,7 @@ public class PlayerHandControllerVR : MonoBehaviour
     IPickable _PickedUp;
     private SteamVR_TrackedObject trackedObj;
     private SteamVR_TrackedController trackedContrl;
+    private SteamVR_Controller.Device device;
 
     private void OnEnable()
     {
@@ -16,6 +17,7 @@ public class PlayerHandControllerVR : MonoBehaviour
         trackedContrl = gameObject.GetComponent<SteamVR_TrackedController>();
         trackedContrl.TriggerClicked += HandleTriggerClicked;
         trackedContrl.TriggerUnclicked += HandleTriggerReleased;
+        device = SteamVR_Controller.Input((int)trackedObj.index);
     }
 
     private void HandleTriggerReleased(object sender, ClickedEventArgs e)
