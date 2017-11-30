@@ -10,7 +10,7 @@ public class MoveFleeEnemy : IMoveEnemy{
     public Vector3 Move(Transform entity, Transform target, float speed)
     {
         var deltaPos = target.position - entity.position;
-        var desiredVel = -deltaPos.normalized * speed;        //La velocidad deseada es la OPUESTA a seek
+        var desiredVel = -deltaPos.normalized * speed * Time.deltaTime;        //La velocidad deseada es la OPUESTA a seek
         return desiredVel;
     }
 }

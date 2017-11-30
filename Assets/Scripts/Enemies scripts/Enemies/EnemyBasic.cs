@@ -8,15 +8,54 @@ using Random = UnityEngine.Random;
 [RequireComponent(typeof(StateMachine_BasicEnemy))]
 public class EnemyBasic : BaseEnemy
 {
-    public Transform target { get { return _target; } }
-    public EnemyBossBasic boss { get; private set; }
-    public float life;
-    public float researchTime = 10;
-    private float _speedRotation = 50f;
-    private Transform _bulletSpawner;
-    bool haveBoss = false;
+    public GameObject Arm;
+    public Transform bulletSpawner;
 
-    void Update()
+    public EnemyBossBasic boss { get; private set; }
+    public Hero hero { get; private set; }
+    public Transform target { get { return _target; } }
+    internal void SetTarget(Transform value) { _target = value; }
+
+    public float life = 100;
+    public float researchTime = 10;
+
+    public const string KEY_MOVE_SEEK = "MoveSeek";
+    public const string KEY_MOVE_FLEE = "MoveFlee";
+    public const string KEY_ATTACK_SIMPLE = "AttackSimple";
+
+    private void Awake()
+    {
+        Strategies();
+        hero = FindObjectOfType<Hero>();
+        _StartSearching();
+        ManagerUpdate.instance.updateFixed -= Execute;
+        _speed = 4;
+    }
+
+
+
+    protected override void Strategies()
+    {
+        //Move behaviors
+        IMoveEnemy move1 = new MoveSeekEnemy();
+        IMoveEnemy move2 = new MoveFleeEnemy();
+
+        _moveBehaviours = new Dictionary<string, IMoveEnemy>();
+        _moveBehaviours.Add(KEY_MOVE_SEEK, move1);
+        _moveBehaviours.Add(KEY_MOVE_FLEE, move2);
+
+        _currentMove = _moveBehaviours[KEY_MOVE_SEEK];
+
+        //Attack behaviors
+        IAttackEnemy attack1 = new AttackSimple();
+
+        _attackBehaviours = new Dictionary<string, IAttackEnemy>();
+        _attackBehaviours.Add(KEY_ATTACK_SIMPLE, attack1);
+
+        _currentAttack = _attackBehaviours[KEY_ATTACK_SIMPLE];
+    }
+
+    void Execute()
     {
         _currentLife = life;
     }
@@ -26,54 +65,36 @@ public class EnemyBasic : BaseEnemy
 
     internal void _Attaking()
     {
-        _currentAttack.Attack(_bulletSpawner.transform);
+        _currentAttack.Attack(bulletSpawner.transform);
+        Arm.transform.LookAt(target.transform);
+
     }
 
-    internal void _Moving()
+    internal void _Moving(Transform target)
     {
-        transform.position -= _currentMove.Move(transform, _target, _speed);
-        transform.LookAt(_target.transform);
+        transform.position += _currentMove.Move(transform, target, _speed);
+        Arm.transform.LookAt(target.transform);
+
+    }
+
+    internal void _ChangeMoving(string value)
+    {
+        _currentMove = _moveBehaviours[value];
     }
 
     internal void _StartSearching()
     {
         var array = FindObjectsOfType<EnemyBossBasic>();
-        if (array.Length > 0 && !haveBoss)
+        if (array.Length > 0 && boss == null)
         {
-            var random = Random.Range(1, array.Length);
-            _target = array[random].transform;
-        }
-        else
-        {
-            haveBoss = false;
-            StartCoroutine(RestartSearch());
+            var random = Random.Range(1, array.Length) - 1;
+            boss = array[random];
         }
     }
 
-    private IEnumerator RestartSearch()
+    private void OnCollisionEnter(Collision collision)
     {
-        yield return new WaitForSeconds(researchTime);
-        _StartSearching();
-    }
-
-    protected override void Strategies() {
-        //Move behaviors
-        IMoveEnemy move1 = new MoveSeekEnemy();
-        IMoveEnemy move2 = new MoveFleeEnemy();
-
-        _moveBehaviours = new Dictionary<string, IMoveEnemy>();
-        _moveBehaviours.Add("MoveSeek", move1);
-        _moveBehaviours.Add("MoveFlee", move2);
-
-        _currentMove = _moveBehaviours["MoveSeek"];
-
-        //Attack behaviors
-        IAttackEnemy attack1 = new AttackSimple();
-
-        _attackBehaviours = new Dictionary<string, IAttackEnemy>();
-        _attackBehaviours.Add("AttackSimple", attack1);
-
-       _currentAttack = _attackBehaviours["AttackSimple"];
+        
     }
 
     protected override void Damage(float value)
@@ -87,10 +108,8 @@ public class EnemyBasic : BaseEnemy
         Destroy(this.gameObject);
     }
 
-    private void Start()
+    private void OnDestroy()
     {
-        Strategies();
-        _target = FindObjectOfType<Hero>().gameObject.transform;
-        _bulletSpawner = GetComponentInChildren<Reference>().gameObject.transform;
+        ManagerUpdate.instance.updateFixed -= Execute;
     }
 }

@@ -6,11 +6,12 @@ using FP;
 [RequireComponent(typeof(EnemyBossBasic))]
 public class StateMachine_BossBasicEnemy : MonoBehaviour {
 
-    public enum EnemyBossBasicAction { Null, Pursuit, Attack, Damage }
+    public enum EnemyBossBasicAction { Null, Pursuit, Attack, AttackBerserk}
     EventFSM<EnemyBossBasicAction> _fsm;
     private EnemyBossBasic _entity;
     private float _minDistanceAttack = 10;
-    bool _isFurius = false;
+    private float _berserkActivePercentage = 0.3f;
+
 
     void Start () {
         _entity = GetComponent<EnemyBossBasic>();
@@ -18,63 +19,92 @@ public class StateMachine_BossBasicEnemy : MonoBehaviour {
 
         var Chasing = new State<EnemyBossBasicAction>("Chasing");
         var Attacking = new State<EnemyBossBasicAction>("Attacking");
+        var AttackingBerserk = new State<EnemyBossBasicAction>("AttackingBerserk");
         var Damaged = new State<EnemyBossBasicAction>("Damaged");
 
         Chasing
             .SetTransition(EnemyBossBasicAction.Attack, Attacking)
-            .SetTransition(EnemyBossBasicAction.Damage, Damaged)
+            .SetTransition(EnemyBossBasicAction.AttackBerserk, AttackingBerserk)
             ;
         Attacking
             .SetTransition(EnemyBossBasicAction.Pursuit, Chasing)
-            .SetTransition(EnemyBossBasicAction.Damage, Damaged)
+            .SetTransition(EnemyBossBasicAction.AttackBerserk, AttackingBerserk)
             ;
-        Damaged
+        AttackingBerserk
             .SetTransition(EnemyBossBasicAction.Pursuit, Chasing)
-            .SetTransition(EnemyBossBasicAction.Attack, Attacking)
+            .SetTransition(EnemyBossBasicAction.AttackBerserk, AttackingBerserk)
             ;
 
         //Pursuit fsm.
-        Chasing[EnemyBossBasicAction.Attack].OnTransition += () => {
-            print("Transition attack-pursuit enemy boss base");
-        };
-
-        Chasing.OnEnter += () => {
-            print("Enter Chasing enemy boss base");
-        };
-
         Chasing.OnUpdate += () => {
+            if (_entity.GetPercentageCurrentLife < _berserkActivePercentage)
+                _entity._ChangeMove("MoveSin");
+
             _entity._Moving();
         };
 
-        Chasing.OnExit += () => {
-            print("Exit Chasing enemy boss base");
-        };
-
         //Attack fsm.
-        Attacking[EnemyBossBasicAction.Pursuit].OnTransition += () => {
-            print("Transition pursuit-attack enemy boss base");
+        Attacking.OnEnter += () => {
+            _minDistanceAttack = 20;
+            _entity._ChangeAttack("AttackSimple");
+            _entity.isAttacking = true;
         };
 
         Attacking.OnUpdate += () => {
-            print("Update Attackin genemy boss base");
             _entity._Attaking();
         };
+
+        Attacking.OnExit += () => {
+            _minDistanceAttack = 10;
+            _entity.isAttacking = false;
+        };
+
+        //Attack berserk fsm.
+        AttackingBerserk.OnEnter += () => {
+            _minDistanceAttack = 30;
+            _entity._ChangeAttack("AttackBerserk");
+            _entity._ChangeMove("MoveSinIdle");
+
+            _entity.isAttacking = true;
+        };
+
+        AttackingBerserk.OnUpdate += () => {
+            _entity._Attaking();
+            _entity._Moving();
+        };
+
+        AttackingBerserk.OnExit += () => {
+            _minDistanceAttack = 10;
+            _entity.isAttacking = false;
+        };
+
 
         _fsm = new EventFSM<EnemyBossBasicAction>(Chasing);
     }
 
     private void Execute()
     {
-        if (!_fsm.Equals(EnemyBossBasicAction.Attack)
-            && Vector3.Distance(_entity.transform.position, _entity.target.position) < _minDistanceAttack){
+        if (!_fsm.Equals(EnemyBossBasicAction.Attack) && !_fsm.Equals(EnemyBossBasicAction.AttackBerserk)
+            && Vector3.Distance(_entity.transform.position, _entity.target.position) < _minDistanceAttack)
+        {
 
-            _fsm.Feed(EnemyBossBasicAction.Attack);
+            if (_entity.GetPercentageCurrentLife > _berserkActivePercentage)
+                _fsm.Feed(EnemyBossBasicAction.Attack);
+            else
+                _fsm.Feed(EnemyBossBasicAction.AttackBerserk);
         }
-        else if (!_fsm.Equals(EnemyBossBasicAction.Attack)){
+        else if (!_fsm.Equals(EnemyBossBasicAction.Pursuit))
+        {
 
             _fsm.Feed(EnemyBossBasicAction.Pursuit);
         }
-
+        
         _fsm.Update();
+    }
+
+
+    private void OnDestroy()
+    {
+        ManagerUpdate.instance.update -= Execute;
     }
 }
